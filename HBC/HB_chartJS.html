@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>DASS</title>
+<script src= "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.bundle.min.js"></script>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+
+</head>
+
+<body  style="-moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;-o-user-select:none;" unselectable="on" onselectstart="return false;" onmousedown="return false;">
+	<canvas id="myChart"></canvas>
+  <img style="display:none;" id="source" src="http://localhost:8080/red_eye.png" width="10" height="10">
+</body>
+<style>
+  html,body {
+    background-color: #1c1c33;
+  }
+</style>
+<script>
+
+Chart.defaults.groupableHBar = Chart.helpers.clone(Chart.defaults.horizontalBar);
+
+Chart.controllers.groupableHBar = Chart.controllers.horizontalBar.extend({
+
+    calculateBarY: function(index, datasetIndex, ruler) {
+        var me = this;
+        var meta = me.getMeta();
+        var yScale = me.getScaleForId(meta.yAxisID);
+        var barIndex = me.getBarIndex(datasetIndex);
+        var topTick = yScale.getPixelForValue(null, index, datasetIndex, me.chart.isCombo);
+        topTick -= me.chart.isCombo ? (ruler.tickHeight / me.getBarCount()) : 0;
+        var stackIndex = this.getMeta().stackIndex;
+
+        if (yScale.options.stacked) {
+            if(ruler.datasetCount>1) {
+                var spBar=ruler.categorySpacing/ruler.datasetCount;
+                var h=me.calculateBarHeight(ruler);
+                
+                return topTick + (((ruler.categoryHeight - h) / me.getBarCount())+ruler.categorySpacing-spBar/me.getBarCount())+(h+spBar)*stackIndex;
+            }
+            return topTick + (ruler.categoryHeight / me.getBarCount()) + ruler.categorySpacing;
+        }
+
+        return topTick +
+            (ruler.barHeight / me.getBarCount()) +
+            ruler.categorySpacing +
+            (ruler.barHeight * barIndex) +
+            (ruler.barSpacing / me.getBarCount()) +
+            (ruler.barSpacing * barIndex);
+    },
+
+    calculateBarHeight: function(ruler) {
+        var returned=0;
+        var me = this;
+        var yScale = me.getScaleForId(me.getMeta().yAxisID);
+        if (yScale.options.barThickness) {
+            returned = yScale.options.barThickness;
+        }
+        else {
+            returned= yScale.options.stacked ? ruler.categoryHeight : ruler.barHeight;
+        }
+        if(ruler.datasetCount>1) {
+            returned=returned/ruler.datasetCount;
+        }
+        return returned;
+    },
+
+    getBarCount: function () {
+        var stacks = [];
+
+        // put the stack index in the dataset meta
+        Chart.helpers.each(this.chart.data.datasets, function (dataset, datasetIndex) {
+            var meta = this.chart.getDatasetMeta(datasetIndex);
+            if (meta.bar && this.chart.isDatasetVisible(datasetIndex)) {
+                var stackIndex = stacks.indexOf(dataset.stack);
+                if (stackIndex === -1) {
+                    stackIndex = stacks.length;
+                    stacks.push(dataset.stack);
+                }
+                meta.stackIndex = stackIndex;
+            }
+        }, this);
+
+        this.getMeta().stacks = stacks;
+
+        return stacks.length;
+    }
+});
+
+Chart.plugins.register ({
+  beforeDraw: function(chartInstance) {
+    var ctx = chartInstance.chart.ctx;
+    ctx.fillStyle = '#1c1c33';
+    ctx.fillRect(0, 0, chartInstance.chart.width, chartInstance.chart.height);
+    purple_orange_gradient = ctx.createLinearGradient(0,0,500,0);
+    purple_orange_gradient.addColorStop(0,"red");
+    purple_orange_gradient.addColorStop(1,"black");
+
+  }
+});
+
+var ctx = document.getElementById("myChart").getContext("2d");
+var image = document.getElementById('source');
+//var fillPattern = ctx.drawImage(image, 64.025390625, 100-5, 20, 10);
+
+var img = new Image();
+img.src = "http://localhost:8080/red_eye.png";
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var parseDate = d3.timeParse("%Y-%m-%d");
+
+var oppArray = [];
+var jsonData1 = [];
+		
+		d3.json("emhbc.json", function(data) {
+			
+				data.forEach(function(dataReq, i) {
+				
+					oppArray.push(dataReq.name);
+
+					if(dataReq.requirements != undefined) {
+						dataReq.requirements.forEach(function(data2, i) {
+							
+							var lce = data2.lifeCycleEvent;
+							if(lce != undefined) {
+								var item = {};
+								lce.forEach(function(dataLCE, i) {
+								
+									dataLCE.startDate = parseDate(dataLCE.startDate);
+									dataLCE.endDate = parseDate(dataLCE.endDate);
+									var timeDiff = Math.abs(dataLCE.endDate.getTime() - dataLCE.startDate.getTime());
+									var diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+								
+									item[dataLCE.name] = diffDays - 21;
+									item["color"] = dataLCE.color;
+								});
+								
+								item["order"] = i;
+								item["name"] = data2.name;
+						
+								/////////////////////////////////
+								//item["initialDelay"] = 0;
+								//item["parallelWorkBetweenReqAnd"] = 0;
+								//item[""] = 0;
+								//item[""] = 0;
+								
+								
+								jsonData1.push(item);
+							}
+							
+						});
+					}
+				});
+			
+	
+console.log(jsonData1);
+
+var stackedData = [];
+
+jsonData1.forEach(function(data2, i) {
+
+	
+
+});
+
+
+
+
+
+///////////////////////////////////////////////DATA/////////////////////////////////////////////////////////////////////
+var data = {
+  labels: oppArray,
+  datasets: [
+	
+  ]
+};
+
+
+var myNewChart = new Chart(ctx, {
+  type: 'groupableHBar',
+  data: data,
+  responsive: true,
+  showTooltips: false,
+  options: {    
+    tooltips: {
+         enabled: false
+    },
+  onClick: graphClickEvent,
+  lineAtIndex: 148,
+	events: ['click'],
+    legend: {
+      display: false,
+    },
+    title: {
+      display: true,
+      position:'top',
+      text: 'Version Increment January 1st to june 30th',
+      fontSize:16,
+      fontStyle:'normal',
+      fontColor: '#d3d3d3'
+    },
+    scales: {
+      yAxes: [{
+        stacked: true,
+        barThickness: 25,
+        barPercentage: 1,
+        categoryPercentage: 0.5,
+        
+        type: 'category',
+        id: 'y-axis-0',
+        gridLines: {
+          display: true,
+          drawTicks: true,
+          color: "#383838"
+        },
+        scaleLabel: {
+          display: true,
+          labelString: 'Teams',
+        }
+      },
+    ],
+      xAxes: [{
+        stacked: true,
+        type: 'linear',
+        position:'top',
+        ticks: {
+          callback: function(dataLabel, index) {
+            if(index != 0)
+            return index % 1 === 0 ? "Tact"+ " "+ (index) : null;
+          },
+          stepSize: 40,
+          stepValue: 40,
+          max: 160
+        },
+        gridLines: {
+          display: true,
+          drawTicks: true,
+          offsetGridLines:false,
+          color: "#383838"
+        },
+        id: 'x-axis-0',
+        display: true,
+      },
+      {
+        stacked: true,
+        position: 'top',
+        type: 'linear',
+        ticks: {
+          beginAtZero:true
+        },
+        id: 'x-axis-1',
+        gridLines: {
+          display: true,
+          drawTicks: true,
+        },
+        display: false,
+      },
+       {
+        stacked: true,
+        position: 'top',
+        type: 'linear',
+        ticks: {
+          beginAtZero:true
+        },
+        id: 'x-axis-2',
+        gridLines: {
+          display: true,
+          drawTicks: true,
+        },
+        display: false
+      },
+       {
+        stacked: true,
+        position: 'top',
+        type: 'linear',
+        ticks: {
+          beginAtZero:true
+        },
+        id: 'x-axis-3',
+        gridLines: {
+          display: true,
+          drawTicks: true,
+        },
+        display: false
+      },
+      {
+        stacked: true,
+        position: 'top',
+        type: 'linear',
+        ticks: {
+          beginAtZero:true
+        },
+        id: 'x-axis-4',
+        gridLines: {
+          display: true,
+          drawTicks: true,
+        },
+        display: false
+      },
+      {
+        stacked: true,
+        position: 'top',
+        type: 'linear',
+        ticks: {
+          beginAtZero:true
+        },
+        id: 'x-axis-5',
+        gridLines: {
+          display: true,
+          drawTicks: true,
+        },
+        display: false
+      }]
+    }
+  }
+});
+	
+
+	  
+
+  function graphClickEvent(evt){
+  
+		var activePoint = myNewChart.getElementAtEvent(evt)[0];
+    console.log("activePoint = ", activePoint);
+    if(activePoint != undefined){
+      var selected_stack = activePoint._chart.config.data.datasets[activePoint._datasetIndex].stack;
+      var filteredStackResult = activePoint._chart.config.data.datasets.filter(stack_filter => stack_filter.stack == selected_stack);
+      var filteredLabelResult = filteredStackResult.filter(filter_label => filter_label.label == "");
+      if( filteredLabelResult[0].backgroundColor[activePoint._index] != undefined && filteredLabelResult[0].backgroundColor[activePoint._index] === "rgba(255, 51, 51, 0.5)"){
+        filteredLabelResult[0].backgroundColor[activePoint._index] = "#1c1c33";
+        myNewChart.update();
+      } else {
+        filteredLabelResult[0].backgroundColor[activePoint._index] = "rgba(255, 51, 51, 0.5)";
+        myNewChart.update();
+      }
+      var image = document.getElementById('source');
+      ctx.save();
+      ctx.drawImage(image, 64.025390625, activePoint._model.y-5, 20, 10);
+      ctx.stroke();
+      ctx.restore();
+    }
+	};
+	  
+// Below code is for showing the white vertical line which represents the current date.
+
+var originalLineDraw = Chart.controllers.groupableHBar.prototype.draw;
+Chart.helpers.extend(Chart.controllers.groupableHBar.prototype, {
+  
+	draw: function () {
+	  originalLineDraw.apply(this, arguments);
+
+	  var chart = this.chart;
+	  var ctx = chart.chart.ctx;
+
+	  var index = chart.config.options.lineAtIndex;
+	  if (index) {
+
+		  var xaxis = chart.scales['x-axis-0'];
+		  var yaxis = chart.scales['y-axis-0'];
+
+		  var x1 = xaxis.getPixelForValue(index);                       
+		  var y1 = 0 + 30;                                                   
+
+		  var x2 = xaxis.getPixelForValue(index);                       
+		  var y2 = yaxis.height + 45;                                        
+
+		  ctx.save();
+		  ctx.beginPath();
+		  ctx.moveTo(x1, y1);
+		  ctx.strokeStyle = '#d3d3d3';
+		  ctx.setLineDash([7, 3]);
+		  ctx.lineTo(x2, y2);
+		  ctx.stroke();
+		  ctx.restore();
+		  
+      // Below code is for showing 'now' text for the white vertical line.
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#d3d3d3';
+      ctx.font = "normal 14px Courier New";
+      ctx.fillText("now", x1, y2 + 12);
+	  }
+	}
+});
+
+
+});
+</script>
+</html>
